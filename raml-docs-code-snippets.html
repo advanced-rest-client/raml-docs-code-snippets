@@ -1,0 +1,276 @@
+<!--
+@license
+Copyright 2016 pawelpsztyc
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use this file except in compliance with the License. You may obtain a copy of
+the License at
+http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+License for the specific language governing permissions and limitations under
+the License.
+-->
+<link rel="import" href="../polymer/polymer.html">
+<link rel="import" href="../http-code-snippets/http-code-snippets.html">
+
+<!--
+The `<raml-docs-code-snippets>` element is a wrapper for the
+`<http-code-snippets>` element that transforms RMAL method definition to
+data format used by the `http-code-snippets`.
+
+This element extracts `url`, `method`, `headers` and `payload` from the RAML
+definition and passes it to the `http-code-snippets`.
+
+Pass method definition (as a JSON object, result of the raml 2 js parser) to
+display code snippets examples for the API.
+
+### Example
+```
+<raml-docs-code-snippets raml="[[method]]"></raml-docs-code-snippets>
+```
+
+### Styling
+`<raml-docs-code-snippets>` provides the following custom properties and mixins for styling:
+
+Custom property | Description | Default
+----------------|-------------|----------
+`--raml-docs-code-snippets` | Mixin applied to the element | `{}`
+
+Use `http-code-snippets` styles to style this element.
+
+@group RAML Elements
+@element raml-docs-code-snippets
+@demo demo/index.html
+-->
+<dom-module id="raml-docs-code-snippets">
+  <template>
+    <style>
+    :host {
+      display: block;
+      @apply(--raml-docs-code-snippets);
+    }
+    </style>
+    <http-code-snippets headers="[[headers]]" method="[[method]]" payload="[[payload]]" url="[[url]]"></http-code-snippets>
+  </template>
+  <script>
+  Polymer({
+    is: 'raml-docs-code-snippets',
+    properties: {
+      /**
+       * A RAML object representing a method in the API structure.
+       * This has to be RAML 2 JS parser JSON output.
+       */
+      raml: {
+        type: Object,
+      },
+      // Computed headers from the `raml` object
+      headers: {
+        type: String,
+        computed: '_computeHeaders(raml.*)'
+      },
+      // Computed method from the `raml` object
+      method: {
+        type: String,
+        computed: '_computeMethod(raml.*)'
+      },
+      // Computed payload from the `raml` object
+      payload: {
+        type: String,
+        computed: '_computePayload(raml.*)'
+      },
+      // Computed url from the `raml` object
+      url: {
+        type: String,
+        computed: '_computeUrl(raml.*)'
+      }
+    },
+    // Computes the URL from the RAML object.
+    _computeUrl: function(record) {
+      if (!record || !record.base) {
+        return undefined;
+      }
+      var url = record.base.absoluteUrl;
+      if (!url) {
+        return undefined;
+      }
+      if (record.base.allUriParameters && record.base.allUriParameters.length) {
+        return this._applyUrlParameters(url, record.base.allUriParameters);
+      }
+      return url;
+    },
+    // Computes HTTP method from the RAML object.
+    _computeMethod: function(record) {
+      if (!record || !record.base) {
+        return undefined;
+      }
+      var method = record.base.method;
+      if (!method) {
+        return undefined;
+      }
+      return method.toUpperCase();
+    },
+    // Computes payload from the RAML object.
+    _computePayload: function(record) {
+      if (!record || !record.base) {
+        return undefined;
+      }
+      if (!record.base.body || !record.base.body.length) {
+        return undefined;
+      }
+      var body = record.base.body[0];
+      if (body.example) {
+        return body.example;
+      }
+      if (body.formParameters) {
+        return this._extractFormParameters(body.formParameters);
+      }
+      if (body.properties || body.anyOf) {
+        return this._extractRamlType(body);
+      }
+      return undefined;
+    },
+    // Computes headers from the RAML object.
+    _computeHeaders: function(record) {
+      if (!record || !record.base) {
+        return undefined;
+      }
+      var headers = record.base.headers;
+      if (!headers) {
+        return undefined;
+      }
+      var result = '';
+      for (var i = 0, len = headers.length; i < len; i++) {
+        if (i !== 0) {
+          result += '\n';
+        }
+        var h = headers[i];
+        result += h.name + ': ';
+        var value = this._getExampleValue(h);
+        if (value) {
+          result += '' + value;
+        }
+      }
+      return result;
+    },
+    /**
+     * Applies an URL parameters in the URL.
+     * The params array need to have the same structure as array of objects
+     * returned by the RAML JS parser.
+     *
+     * @param {String} url An URL defined in the RAML file. It's a concatenation
+     * of the base URI and the method's relative path.
+     * @param {Array<Object>} params Array of parameters consistent with the
+     * RAML JS parser output.
+     */
+    _applyUrlParameters: function(url, params) {
+      if (!url) {
+        return undefined;
+      }
+      if (!params || !params.length) {
+        return url;
+      }
+      for (var i = 0, len = params.length; i < len; i++) {
+        var p = params[i];
+        var key = p.name;
+        var replacement = this._getExampleValue(p);
+        if (!replacement) {
+          continue;
+        }
+        var re = new RegExp('{' + key + '}');
+        url = url.replace(re, replacement);
+      }
+      return url;
+    },
+    /**
+     * Gets an example value from the parameter definition.
+     *
+     * @param {Object} param A parameter definition.
+     * @return {String|null} An example value if any was defined in the RAML.
+     */
+    _getExampleValue: function(param) {
+      var value = null;
+      if (!param) {
+        return value;
+      }
+      if (param.examples && param.examples.length) {
+        value = param.examples[0];
+      } else if (param.example) {
+        value = param.example;
+      } else if (param.enum && param.enum.length) {
+        value = param.enum[0];
+      } else if (param.type) {
+        value = param.type;
+      }
+      return value;
+    },
+    /**
+     * @param {Object} params The object to encode as x-www-form-urlencoded.
+     * @return {string} .
+     */
+    _extractFormParameters: function(params) {
+      if (!params) {
+        return '';
+      }
+      var pieces = [];
+      Object.keys(params).forEach(function(key) {
+        var value = this._getExampleValue(params[key]);
+        pieces.push(
+            this._wwwFormUrlEncodePiece(key) + '=' +
+            this._wwwFormUrlEncodePiece(value));
+      }, this);
+      return pieces.join('&');
+    },
+    /**
+     * @param {*} str A key or value to encode as x-www-form-urlencoded.
+     * @return {string} .
+     */
+    _wwwFormUrlEncodePiece: function(str) {
+      // Spec says to normalize newlines to \r\n and replace %20 spaces with +.
+      // jQuery does this as well, so this is likely to be widely compatible.
+      if (!str) {
+        return '';
+      }
+      return encodeURIComponent(str.toString().replace(/\r?\n/g, '\r\n'))
+          .replace(/%20/g, '+');
+    },
+    /**
+     * Extracts the RAML type to a JSON string.
+     *
+     * @param {Object} object A RAML type definition.
+     * @return {String} JSON structure.
+     */
+    _extractRamlType: function(object) {
+      var result = {};
+      if (object.properties && object.properties.length) {
+        object.properties.forEach(function(property) {
+          this._extractProperty(property, result);
+        }, this);
+      }
+      if (object.anyOf && object.anyOf.length) {
+        var union = object.anyOf[0];
+        if (union.properties && union.properties.length) {
+          union.properties.forEach(function(property) {
+            this._extractProperty(property, result);
+          }, this);
+        }
+      }
+      return JSON.stringify(result, null, 2);
+    },
+
+    _extractProperty: function(property, dest) {
+      var theKey = property.key || property.name;
+      var value = this._getExampleValue(property);
+      if ((!value || value === 'object') && property.properties &&
+        property.properties.length) {
+        dest[theKey] = {};
+        property.properties.forEach(function(item) {
+          this._extractProperty(item, dest[theKey]);
+        }, this);
+        return;
+      }
+      dest[theKey] = this._getExampleValue(property);
+    }
+  });
+  </script>
+</dom-module>

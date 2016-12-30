@@ -1,0 +1,32 @@
+{
+  "name": "raml-docs-code-snippets",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "description": "An element to display an examples of the API calls in different platforms for the RAML documentation viewer",
+  "devDependencies": {
+    "polymer-cli": "^0.16.0"
+  },
+  "engines": {
+    "node": ">=0.10.0"
+  },
+  "private": false,
+  "main": [
+    "raml-docs-code-snippets.html"
+  ],
+  "author": "pawelpsztyc",
+  "scripts": {
+    "serve": "node_modules/.bin/polymer serve",
+    "list": "node_modules/.bin/polymer lint raml-docs-code-snippets.html",
+    "test-sauce": "node_modules/.bin/polymer test --plugin sauce --job-name \"raml-docs-code-snippets:local-test\"",
+    "test": "node_modules/.bin/polymer test",
+    "deps": "npm install --quiet && bower install --quiet",
+    "update-deps": "npm update --quiet && bower update --quiet"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/advanced-rest-client/raml-docs-code-snippets.git"
+  },
+  "bugs": {
+    "url": "https://github.com/advanced-rest-client/raml-docs-code-snippets/issues"
+  }
+}
