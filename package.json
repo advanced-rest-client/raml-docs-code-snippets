@@ -1,6 +1,6 @@
 {
   "name": "raml-docs-code-snippets",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "Apache-2.0",
   "description": "An element to display an examples of the API calls in different platforms for the RAML documentation viewer",
   "devDependencies": {
